@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* 自定義樣式 */
+:root {
+  --primary-pink: #ff6b9d;
+  --primary-purple: #c44569;
+  --bg-cream: #fff9f5;
+}
+
+body {
+  background-color: var(--bg-cream);
+  font-family: 'Noto Sans TC', sans-serif;
+}
+
+/* 隱藏滾動條但保持可滾動 */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
