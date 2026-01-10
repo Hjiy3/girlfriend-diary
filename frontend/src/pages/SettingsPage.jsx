@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Heart, Download, Upload, Trash2, Database } from 'lucide-react';
+import { Heart, Download, Upload, Trash2, Database, CloudDownload } from 'lucide-react';
 import { db, getSettings, updateSettings } from '../services/db';
 import { formatDate, getDaysTogether } from '../utils/helpers';
+import { pullFromCloud } from '../services/sync';
 
 function SettingsPage() {
   const [settings, setSettings] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [stats, setStats] = useState({ diaries: 0, photos: 0, anniversaries: 0 });
 
   // 載入設定
   useEffect(() => {
     getSettings().then(setSettings);
-    
+
     // 載入統計
     Promise.all([
       db.diaries.count(),
@@ -81,6 +83,24 @@ function SettingsPage() {
       }
     };
     reader.readAsText(file);
+  };
+
+  // 從雲端還原（B 方案核心）
+  const handleRestoreFromCloud = async () => {
+    const ok = confirm('將從雲端還原資料，並覆蓋你目前手機/瀏覽器的本機資料。確定要繼續嗎？');
+    if (!ok) return;
+
+    setRestoring(true);
+    try {
+      const result = await pullFromCloud();
+      alert(`還原成功！\n日記：${result.diaries}\n照片：${result.photos}\n紀念日：${result.anniversaries}${result.wishlist ? `\n收藏：${result.wishlist}` : ''}`);
+      window.location.reload();
+    } catch (e) {
+      alert(`還原失敗：${e?.message || '未知錯誤'}`);
+      console.error(e);
+    } finally {
+      setRestoring(false);
+    }
   };
 
   // 清除所有資料
@@ -201,6 +221,20 @@ function SettingsPage() {
           <Download size={18} className="text-pink-400" />
           備份與還原
         </h2>
+
+        {/* B 方案：從雲端還原 */}
+        <button
+          onClick={handleRestoreFromCloud}
+          disabled={restoring}
+          className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg transition-colors ${
+            restoring
+              ? 'bg-blue-100 text-blue-600'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+        >
+          <CloudDownload size={18} />
+          {restoring ? '雲端還原中...' : '從雲端還原（Supabase）'}
+        </button>
 
         <button
           onClick={handleExport}

@@ -114,6 +114,9 @@ export async function syncAll() {
 
 // 從雲端拉取資料（用於還原或新裝置）
 export async function pullFromCloud() {
+  // 強制先檢查一次線上狀態，避免 isOnline 尚未更新導致誤判
+  await checkOnlineStatus();
+
   if (!isOnline) {
     throw new Error('雲端未連線');
   }
@@ -121,39 +124,73 @@ export async function pullFromCloud() {
   try {
     console.log('📥 從雲端拉取資料...');
 
-    // 拉取日記
-    const diaries = await api.fetchDiaries();
-    for (const diary of diaries) {
-      await db.diaries.put({
-        date: diary.date,
-        content: diary.content,
-        mood: diary.mood,
-        tags: diary.tags || [],
-        createdAt: diary.created_at,
-        updatedAt: diary.updated_at,
-        synced: true
-      });
-    }
+    // 一次把雲端資料抓下來（避免拉到一半失敗造成半套資料）
+    const [diaries, photos, anniversaries] = await Promise.all([
+      api.fetchDiaries(),
+      api.fetchPhotos(),
+      api.fetchAnniversaries()
+    ]);
 
-    // 拉取紀念日
-    const anniversaries = await api.fetchAnniversaries();
-    await db.anniversaries.clear();
-    for (const a of anniversaries) {
-      await db.anniversaries.add({
-        title: a.title,
-        date: a.date,
-        type: a.type,
-        remind: a.remind,
-        createdAt: a.created_at
-      });
-    }
-
-    // 拉取收藏清單（若後端已提供）
+    // wishlist（若後端已提供）
+    let wishlist = null;
     if (typeof api.fetchWishlist === 'function') {
-      const wishlist = await api.fetchWishlist();
-      await db.wishlist.clear();
-      for (const w of wishlist) {
-        await db.wishlist.add({
+      wishlist = await api.fetchWishlist();
+    }
+
+    // 用 transaction 確保寫入一致性
+    await db.transaction('rw', db.diaries, db.photos, db.anniversaries, db.settings, ...(db.wishlist ? [db.wishlist] : []), async () => {
+      // 還原策略：清空後覆蓋（新裝置/新網址最乾淨）
+      await db.diaries.clear();
+      await db.photos.clear();
+      await db.anniversaries.clear();
+      if (db.wishlist && wishlist) {
+        await db.wishlist.clear();
+      }
+
+      // 寫入日記
+      if (diaries?.length) {
+        const formattedDiaries = diaries.map(diary => ({
+          date: diary.date,
+          content: diary.content,
+          mood: diary.mood,
+          tags: diary.tags || [],
+          createdAt: diary.created_at,
+          updatedAt: diary.updated_at,
+          synced: true
+        }));
+        await db.diaries.bulkPut(formattedDiaries);
+      }
+
+      // 寫入照片（關鍵：把 data/base64 寫回 Dexie）
+      if (photos?.length) {
+        const formattedPhotos = photos.map(p => ({
+          // Dexie 的 id 是 ++id（自增），不要用 supabase 的 id 來塞，避免衝突
+          diaryDate: p.diary_date,
+          filename: p.filename,
+          data: p.data,           // Base64（你 GalleryPage 直接用 photo.data 顯示）
+          caption: p.caption || '',
+          createdAt: p.created_at,
+          synced: true
+        }));
+        await db.photos.bulkAdd(formattedPhotos);
+      }
+
+      // 寫入紀念日
+      if (anniversaries?.length) {
+        const formattedAnniversaries = anniversaries.map(a => ({
+          title: a.title,
+          date: a.date,
+          type: a.type,
+          remind: a.remind,
+          createdAt: a.created_at
+        }));
+        // anniversaries 是 ++id，自增即可
+        await db.anniversaries.bulkAdd(formattedAnniversaries);
+      }
+
+      // 寫入收藏清單（若有）
+      if (db.wishlist && wishlist?.length) {
+        const formattedWishlist = wishlist.map(w => ({
           type: w.type,
           name: w.name,
           location: w.location,
@@ -161,12 +198,18 @@ export async function pullFromCloud() {
           done: !!w.done,
           createdAt: w.created_at || w.createdAt || new Date().toISOString(),
           synced: true
-        });
+        }));
+        await db.wishlist.bulkAdd(formattedWishlist);
       }
-    }
+    });
 
     console.log('✅ 拉取完成！');
-    return { diaries: diaries.length, anniversaries: anniversaries.length };
+    return {
+      diaries: diaries?.length || 0,
+      photos: photos?.length || 0,
+      anniversaries: anniversaries?.length || 0,
+      wishlist: wishlist?.length || 0
+    };
 
   } catch (error) {
     console.error('❌ 拉取失敗:', error);
