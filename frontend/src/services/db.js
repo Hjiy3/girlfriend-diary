@@ -3,24 +3,33 @@ import Dexie from 'dexie';
 // 建立資料庫
 export const db = new Dexie('GirlfriendDiaryDB');
 
-// 定義資料表結構
+// v1：原本的結構
 db.version(1).stores({
-  // 日記表
   diaries: '&date, mood, createdAt, updatedAt, synced',
-  // 照片表
   photos: '++id, diaryDate, filename, caption, createdAt, synced',
-  // 紀念日表
   anniversaries: '++id, title, date, type, remind, createdAt',
-  // 設定表
   settings: 'key',
-  // LINE 對話記錄
   lineChats: '++id, date, time, sender, message, importedAt'
+});
+
+// v2：新增 wishlist
+db.version(2).stores({
+  diaries: '&date, mood, createdAt, updatedAt, synced',
+  photos: '++id, diaryDate, filename, caption, createdAt, synced',
+  anniversaries: '++id, title, date, type, remind, createdAt',
+  settings: 'key',
+  lineChats: '++id, date, time, sender, message, importedAt',
+
+  // 收藏清單：想去/想吃
+  // type: 'place' | 'food'
+  // done: boolean
+  wishlist: '++id, type, name, location, done, createdAt, synced'
 });
 
 // 預設設定
 export const defaultSettings = {
   coupleName: ['我', '寶貝'],
-  togetherDate: '2024-08-13', // 在一起的日期，之後可以改
+  togetherDate: '2024-08-13',
   theme: 'pink'
 };
 

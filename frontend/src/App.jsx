@@ -10,13 +10,11 @@ import GalleryPage from './pages/GalleryPage';
 import AnniversariesPage from './pages/AnniversariesPage';
 import StatsPage from './pages/StatsPage';
 import SettingsPage from './pages/SettingsPage';
+import WishlistPage from './pages/WishlistPage';
 
 function App() {
   useEffect(() => {
-    // 初始化資料庫設定
     initSettings();
-    
-    // 啟動同步排程
     startSyncScheduler();
   }, []);
 
@@ -28,6 +26,7 @@ function App() {
           <Route path="diary/:date" element={<DiaryPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="gallery" element={<GalleryPage />} />
+          <Route path="wishlist" element={<WishlistPage />} />
           <Route path="anniversaries" element={<AnniversariesPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="settings" element={<SettingsPage />} />

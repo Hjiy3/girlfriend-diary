@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { X, Calendar } from 'lucide-react';
+import { X, Calendar, Download } from 'lucide-react';
 import { db } from '../services/db';
 import { formatDate } from '../utils/helpers';
+
+function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename || 'photo.jpg';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 function GalleryPage() {
   const navigate = useNavigate();
@@ -69,7 +78,7 @@ function GalleryPage() {
 
       {/* 照片預覽 Modal */}
       {selectedPhoto && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedPhoto(null)}
         >
@@ -86,7 +95,8 @@ function GalleryPage() {
               alt={selectedPhoto.filename}
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
-            <div className="mt-4 text-center">
+
+            <div className="mt-4 flex items-center justify-center gap-3">
               <button
                 onClick={() => {
                   navigate(`/diary/${selectedPhoto.diaryDate}`);
@@ -96,6 +106,20 @@ function GalleryPage() {
               >
                 <Calendar size={18} />
                 {formatDate(selectedPhoto.diaryDate)}
+              </button>
+
+              <button
+                onClick={() => {
+                  const safeName =
+                    selectedPhoto.originalName ||
+                    selectedPhoto.filename ||
+                    `photo-${selectedPhoto.diaryDate}.jpg`;
+                  downloadDataUrl(selectedPhoto.data, safeName);
+                }}
+                className="inline-flex items-center gap-2 text-white bg-pink-500/80 px-4 py-2 rounded-full hover:bg-pink-500 transition-colors"
+              >
+                <Download size={18} />
+                下載
               </button>
             </div>
           </div>
